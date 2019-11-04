@@ -102,3 +102,14 @@ venv.bak/
 
 # mypy
 .mypy_cache/
+
+#ignore data folder
+data/
+result/
+checkpoints/
+
+#ignore variables
+*.png
+*.mp4
+*.npy
+
