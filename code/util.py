@@ -11,6 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.nn.functional as F
 import torch.optim as optim
 from skimage import io
+import math
 from tqdm import *
 from dataset import *
 
@@ -30,8 +31,8 @@ def ConvOutSize(in_size, ConvLayNum, kernel, stride, padding):
     if isinstance(kernel, int):
         kernel = (kernel, kernel)
     for _ in range(ConvLayNum):
-        height = (height - kernel[0] + 2*padding)/stride + 1
-        width = (width - kernel[1] + 2*padding)/stride + 1
+        height = math.floor((height - kernel[0] + 2*padding)/stride + 1)
+        width = math.floor((width - kernel[1] + 2*padding)/stride + 1)
     return (height, width)
 
 

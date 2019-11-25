@@ -32,15 +32,28 @@ h_layer_6 = 1200
 """
 # A block consisting of convolution, batch normalization (optional) followed by a nonlinearity (defaults to Leaky ReLU)
 class ConvUnit(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel, stride=1, padding=0, batchnorm=True, nonlinearity=nn.LeakyReLU(0.2)):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        kernel, 
+        stride= 1, 
+        padding=0, 
+        batchnorm: bool = True,
+        bias: bool = True, 
+        nonlinearity=nn.LeakyReLU(0.2), 
+        init=nn.init.kaiming_normal_,):
         super(ConvUnit, self).__init__()
+        bias = bias and (not batchnorm)
         if batchnorm is True:
             self.model = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, kernel, stride, padding),
+                    nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias),
                     nn.BatchNorm2d(out_channels), nonlinearity)
         else:
-            self.model = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel, stride, padding), nonlinearity)
-
+            self.model = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias), nonlinearity)
+        init(self.model.weight)
+        if bias:
+            nn.init.constant_(self.model.bias, 0)
     def forward(self, x):
         return self.model(x)
 
