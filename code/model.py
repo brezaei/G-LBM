@@ -22,11 +22,10 @@ from torch import nn, optim
 
 # parameters of the encoder and decoder
 h_layer_1 = 32
-h_layer_2 = 64
-h_layer_3 = 128
-h_layer_4 = 128
+h_layer_2 = 32
+h_layer_3 = 64
+h_layer_4 = 64
 h_layer_5 = 2400
-h_layer_6 = 1200
 """
     defining the encoder and decoder blocks
 """
@@ -40,9 +39,9 @@ class ConvUnit(nn.Module):
         stride= 1, 
         padding=0, 
         batchnorm: bool = True,
-        bias: bool = True, 
-        nonlinearity=nn.LeakyReLU(0.2), 
-        init=nn.init.kaiming_normal_,):
+        bias: bool = False, 
+        nonlinearity=nn.LeakyReLU(0.2)
+        ):
         super(ConvUnit, self).__init__()
         bias = bias and (not batchnorm)
         if batchnorm is True:
@@ -51,44 +50,58 @@ class ConvUnit(nn.Module):
                     nn.BatchNorm2d(out_channels), nonlinearity)
         else:
             self.model = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias), nonlinearity)
-        init(self.model.weight)
-        if bias:
-            nn.init.constant_(self.model.bias, 0)
     def forward(self, x):
         return self.model(x)
 
 # A block consisting of a transposed convolution, batch normalization (optional) followed by a nonlinearity (defaults to Leaky ReLU)
 class ConvUnitTranspose(nn.Module):
-    def __init__(self, in_channels, out_channels, kernel, stride=1, padding=0, out_padding=0, batchnorm=True, nonlinearity=nn.LeakyReLU(0.2)):
+    def __init__(
+        self, 
+        in_channels, 
+        out_channels, 
+        kernel, 
+        stride=1, 
+        padding=0, 
+        out_padding=0, 
+        batchnorm:bool=True,
+        bias:bool=True, 
+        nonlinearity=nn.LeakyReLU(0.2)
+        ):
         super(ConvUnitTranspose, self).__init__()
+        bias = bias and (not batchnorm)
         if batchnorm is True:
             self.model = nn.Sequential(
-                    nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding),
+                    nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding, bias=bias),
                     nn.BatchNorm2d(out_channels), nonlinearity)
         else:
-            self.model = nn.Sequential(nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding), nonlinearity)
-
+            self.model = nn.Sequential(nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding, bias=bias), nonlinearity)
     def forward(self, x):
         return self.model(x)
 
 # A block consisting of an affine layer, batch normalization (optional) followed by a nonlinearity (defaults to Leaky ReLU)
 class LinearUnit(nn.Module):
-    def __init__(self, in_features, out_features, batchnorm=True, nonlinearity=nn.LeakyReLU(0.2)):
+    def __init__(
+        self, 
+        in_features, 
+        out_features, 
+        batchnorm:bool=True, 
+        nonlinearity=nn.LeakyReLU(0.2)
+        ):
         super(LinearUnit, self).__init__()
         if batchnorm is True:
             self.model = nn.Sequential(
-                    nn.Linear(in_features, out_features),
+                    nn.Linear(in_features, out_features, bias= False),
                     nn.BatchNorm1d(out_features), nonlinearity)
         else:
             self.model = nn.Sequential(
-                    nn.Linear(in_features, out_features), nonlinearity)
+                    nn.Linear(in_features, out_features, bias=True), nonlinearity)
 
     def forward(self, x):
         return self.model(x)
 
 
 # defining the VAE model
-class VAE(nn.Module):
+class LR_VAE(nn.Module):
     r"""Network Architecture:
         PRIOR OF Z:
             The prior of z is a Gaussian with mean 0 and variance I
@@ -123,42 +136,41 @@ class VAE(nn.Module):
                   The initial video tensor (batch_size, num_channels, in_size[0], in_size[1]) is converted to (batch_size, conv_dim)
 
     Optimization:
-        The model is trained with the Adam optimizer with a learning rate of 0.0002, betas of 0.9 and 0.999, with a batch size of 25 for 200 epochs
+        The model is trained with the Adam optimizer with a learning rate of 0.0001, betas of 0.9 and 0.999, with a batch size of 120 for 200 epochs
 
     """
-    def __init__(self, kernel=5, stride =2, z_dim=32, in_size=(320,240),
-                 frames = 20, nonlinearity=None, device=torch.device('cpu')):
-        super(VAE, self).__init__()
-        self.device = device
+    def __init__(self, kernel=4, stride =2, z_dim=120, in_size=(320,240),
+                 frames = 1, nonlinearity=None):
+        super(LR_VAE, self).__init__()
         self.kernel = kernel
         self.stride = stride
         self.z_dim = z_dim
         self.in_size = in_size
         self.frames = frames
-        nl = nn.LeakyReLU(0.2) if nonlinearity is None else nonlinearity
+        self.nl = nn.LeakyReLU(0.2) if nonlinearity is None else nonlinearity
 
         # ///TODO: Check if only one affine transform is sufficient.
-        self.z_mean = LinearUnit(h_layer_6, self.z_dim, False)
-        self.z_logvar = LinearUnit(h_layer_6, self.z_dim, False)
+        self.z_mean = LinearUnit(h_layer_5, self.z_dim, batchnorm=False)
+        self.z_logvar = LinearUnit(h_layer_5, self.z_dim, batchnorm=False)
+        # ///TODO: check if it is better to add padding in here instead of output padding in deconv
         self.conv = nn.Sequential(
-                ConvUnit(3, h_layer_1, self.kernel, self.stride, 2), # 3* -> 
-                ConvUnit(h_layer_1, h_layer_2, self.kernel, self.stride, 0), #  -> 
-                ConvUnit(h_layer_2, h_layer_3, self.kernel, self.stride, 0), #  -> 
-                ConvUnit(h_layer_3, h_layer_4, self.kernel, self.stride, 0), #  -> 
+                ConvUnit(3, h_layer_1, self.kernel, self.stride), 
+                ConvUnit(h_layer_1, h_layer_2, self.kernel, self.stride, nonlinearity=self.nl), 
+                ConvUnit(h_layer_2, h_layer_3, self.kernel, self.stride, nonlinearity=self.nl),
+                ConvUnit(h_layer_3, h_layer_4, self.kernel, self.stride, nonlinearity=self.nl), 
                 )
-        self.final_conv_size = ConvOutSize(in_size, 4 , self.kernel, self.stride, 0)
+        self.final_conv_size, self.pad_list = ConvOutSize(in_size, 4 , self.kernel, self.stride, 0)
 
-        self.conv_fc = nn.Sequential(LinearUnit(h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), h_layer_5),
-                LinearUnit(h_layer_5, h_layer_6))
+        self.conv_fc = LinearUnit(h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), h_layer_5)
 
-        self.deconv_fc = nn.Sequential(LinearUnit(self.z_dim, h_layer_6, False),
-                LinearUnit(h_layer_6, h_layer_5, False),
+        self.deconv_fc = nn.Sequential(LinearUnit(self.z_dim, h_layer_5, batchnorm=False),
                 LinearUnit(h_layer_5, h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), False))
+        #///TODO: try the nn.Tanh() as the nonlinearity, it scales the output in [-1, 1] compared to sigmoid which is [0, 1]
         self.deconv = nn.Sequential(
-                ConvUnitTranspose(h_layer_4, h_layer_3, self.kernel, self.stride, 0, 0),
-                ConvUnitTranspose(h_layer_3, h_layer_2, self.kernel, self.stride, 0, 0),
-                ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, 0, 1),
-                ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, 0, 0, nonlinearity=nn.Tanh()))
+                ConvUnitTranspose(h_layer_4, h_layer_3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[3]),
+                ConvUnitTranspose(h_layer_3, h_layer_2, self.kernel, self.stride, padding=0, out_padding=self.pad_list[2]),
+                ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, padding=0, out_padding=self.pad_list[1]),
+                ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[0], nonlinearity=nn.Tanh()))
 
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
@@ -193,14 +205,14 @@ class VAE(nn.Module):
 
     def reparam(self, z_mean, z_logvar, random_sampling=True):
         if random_sampling is True:
-            eps = torch.randn_like(logvar)
-            std = torch.exp(0.5*logvar)
-            z = mean + eps*std
+            eps = torch.randn_like(z_logvar)
+            std = torch.exp(0.5*z_logvar)
+            z = z_mean + eps*std
             return z
         else:
             return z_mean
     def forward(self, x):
-        z_mean, z_logvar = self.encoder(self, x)
+        z_mean, z_logvar = self.encoder(x)
         z = self.reparam(z_mean, z_logvar)
         return self.decoder(z), z_mean, z_logvar, z
 
