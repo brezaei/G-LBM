@@ -154,8 +154,8 @@ class BNMomentumScheduler(object):
 
 class Trainer(object):
     def __init__(self, model, optimizer, im_size, loss_fn, lr_scheduler = None, 
-                 lr_warmup_scheduler=None, bnm_scheduler=None, warmup_epoch=-1, grad_norm_clip=1.0, check_freq=5,
-                 learning_rate=0.002, recon_path='../recon/', ckpt_dir='../checkpoints/'):
+                 lr_warmup_scheduler=None, bnm_scheduler=None, warmup_epoch=-1, grad_norm_clip=1.0, check_freq=10,
+                 learning_rate=0.001, recon_path='../recon/', ckpt_dir='../checkpoints/'):
         self.model = model
         self.im_size = im_size
         self.loss_fn = loss_fn
@@ -206,25 +206,19 @@ class Trainer(object):
             print("No checkpoint exists at {}. Start fresh training".format(self.load_checkpoint_path))
             self.start_epoch =  0
             self.start_it = 0
-    def recon_frame(self, epoch, original):
+    def recon_frame(self, epoch, sample_id, original):
         with torch.no_grad():
-            recon = self.model(original)
+            recon,_, _, _ = self.model(original)
             image = torch.cat((original, recon), dim=0)
             image = image.view(2,3, self.im_size[0], self.im_size[1])
-            os.makedirs(os.path.dirname('{}/epoch{}.png'.format(self.recon_path, epoch)), exist_ok=True)
-            torchvision.utils.save_image(image, '{}/epoch{}.png'.format(self.recon_path, epoch))
+            os.makedirs(os.path.dirname('{}/epoch{}_sample{}.png'.format(self.recon_path, epoch, sample_id)), exist_ok=True)
+            torchvision.utils.save_image(image, '{}/epoch{}_sample{}.png'.format(self.recon_path, epoch, sample_id))
     def train_model(self, n_epochs, train_loader, test_loader=None):
         it = self.start_it
         self.model.train()
         with tqdm.trange(self.start_epoch, n_epochs, desc='epochs') as tbar, \
                 tqdm.tqdm(total=len(train_loader), leave=False, desc='train') as pbar:
             for epoch in tbar:
-                if self.lr_scheduler is not None and self.warmup_epoch <= epoch:
-                    self.lr_scheduler.step(epoch)
-
-                if self.bnm_scheduler is not None:
-                    self.bnm_scheduler.step(it)
-                    #self.tb_log.add_scalar('bn_momentum', self.bnm_scheduler.lmbd(epoch), it)
                 losses = []
                 klds = []
                 nuclears = []
@@ -255,6 +249,12 @@ class Trainer(object):
                     pbar.set_postfix(dict(total_it=it))
                     tbar.set_postfix(dict(loss = loss))
                     tbar.refresh()
+                if self.lr_scheduler is not None and self.warmup_epoch <= epoch:
+                    self.lr_scheduler.step(epoch)
+
+                if self.bnm_scheduler is not None:
+                    self.bnm_scheduler.step(it)
+                    print('bn_momentum', self.bnm_scheduler.lmbd(epoch), it)
                 meanloss = np.mean(losses)
                 meankld = np.mean(klds)
                 meanl1 = np.mean(l1s)
@@ -266,9 +266,10 @@ class Trainer(object):
                     self.save_checkpoint(epoch, it)
                     self.model.eval()
                     if test_loader is not None:
-                        sample = test_loader[int(torch.randint(0,len(test_loader)-1,(1,)).item())] # to get a python number from tensor
-                        sample = torch.unsqueeze(sample, 0)
-                        self.recon_frame(epoch+1, sample)
+                        for i, sample in enumerate(test_loader):
+                            sample = sample.cuda(non_blocking=True).float()
+                            #sample = torch.unsqueeze(sample, 0)
+                            self.recon_frame(epoch+1, i, sample)
                     self.model.train()
         print("Training is complete")
 
@@ -295,6 +296,7 @@ class dataset_singleVideo(Dataset):
         img_name = os.path.join(self.path, self.img_list[idx])
         frame = io.imread(img_name)
         frame = frame.transpose((2, 0, 1))
+        frame = frame/255.0
         frame = torch.from_numpy(frame).unsqueeze(0)
         if self.transform:
             frame = self.transform(frame)

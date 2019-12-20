@@ -4,6 +4,7 @@ import torch.optim.lr_scheduler as lr_sched
 import torch.nn as nn
 from torch.utils.data import DataLoader, RandomSampler
 import os
+import numpy as np
 import argparse
 from skimage import io
 
@@ -11,20 +12,22 @@ from model import LR_VAE
 import util 
 ###############################################################
 parser = argparse.ArgumentParser(description="arg parser")
-parser.add_argument("--batch_size", type=int, default=120, help="Batch size [default: 120]")
-parser.add_argument("--epochs", type=int, default=200, required=True, help="Number of epochs to train for [default=200]")
-parser.add_argument("--alpha", type=float, default=1.0, help="rank regularizer [default: 1.0]")
-parser.add_argument("--beta", type=float, default=0.8, help="KL divergence regularizer [default: 0.8]")
-parser.add_argument("--vid_path", type=str, required=True, help="video frame folder path to be processed")
-parser.add_argument("--ckpt", type=str, default=None, help="continue training from this checkpoint")
-parser.add_argument('--mgpus', action='store_true', default=False, help='whether to use multiple gpu')
-parser.add_argument('--train_with_eval', action='store_true', default=False, help='whether to train with evaluation')
-parser.add_argument("--weight_decay",type=float,default=0.001,help="L2 regularization coeff [default: 0.0]")
-parser.add_argument("--lr", type=float, default=2e-3, help="Initial learning rate [default: 1e-2]")
-parser.add_argument("--lr_decay",type=float,default=0.5,help="Learning rate decay gamma [default: 0.5]")
-parser.add_argument("--decay_step_list",type=float,default=[100, 150, 180, 200],help="Learning rate decay step [default: 50]")
-parser.add_argument("--clip", type=float, default=1.0, help="clip value for the gradient [default=5.0]")
-parser.add_argument("--im_format", type=str, default='jpg', help="image format of the video frames")
+parser.add_argument("-batch_size", type=int, default=120, help="Batch size [default: 120]")
+parser.add_argument("-epochs", type=int, default=200, required=True, help="Number of epochs to train for [default=200]")
+parser.add_argument("-alpha", type=float, default=1.0, help="rank regularizer [default: 1.0]")
+parser.add_argument("-beta", type=float, default=0.8, help="KL divergence regularizer [default: 0.8]")
+parser.add_argument("-vid_path", type=str, required=True, help="video frame folder path to be processed")
+parser.add_argument("-ckpt", type=str, default=None, help="continue training from this checkpoint")
+parser.add_argument("-recon_path", type=str, default='../recon/', help="path to the folder for reconstructed frames")
+parser.add_argument("-ckpt_dir", type=str, default='../checkpoints/', help="path to the folder for saving the checkpoints")
+parser.add_argument('--mgpus', action='store_true', help='whether to use multiple gpus')
+parser.add_argument('--train_with_eval', action='store_true', help='whether to train with evaluation')
+parser.add_argument("-weight_decay",type=float,default=0.001,help="L2 regularization coeff [default: 0.0]")
+parser.add_argument("-lr", type=float, default=1e-3, help="Initial learning rate [default: 1e-2]")
+parser.add_argument("-lr_decay",type=float,default=0.5,help="Learning rate decay gamma [default: 0.5]")
+parser.add_argument("-decay_step_list", nargs='+', type=int,default=[50, 100, 150, 200, 250, 300],help="Learning rate decay step [default: 50, 100, 150, 200, 250, 300]")
+parser.add_argument("-clip", type=float, default=1.0, help="clip value for the gradient [default=5.0]")
+parser.add_argument("-im_format", type=str, default='jpg', help="image format of the video frames")
 args = parser.parse_args()
 ###############################################################
 
@@ -33,18 +36,20 @@ args = parser.parse_args()
 params = {
         'optimizer': 'adam',
         'shuffle': False,
+        'check_freq':20,
         'num_workers': 4,
         'num_smpls':10,
         'lr_warmup':False,
         'lr_clip':1e-5,
         'warmup_min':0.0002,
-        'warmup_epoch':1,
+        'warmup_epoch':5,
         'bn_decay':0.5,
         'bn_momentum':0.1,
         'bnm_clip':0.01,
-        'bn_decay_step_list':[1000],
+        'bn_decay_step_list':[50, 100, 150, 200, 250, 300],
         'momentum':0.9
 }
+np.random.seed(seed=0)
 def create_dataloader():
 
     # create dataloader
@@ -53,9 +58,13 @@ def create_dataloader():
                               num_workers=params['num_workers'], shuffle=False, drop_last=True)
 
     print("++++++++++++ Training Data is loaded containing {} batches of size:{}".format(len(train_loader), args.batch_size))
+    #print(args.train_with_eval)
     if args.train_with_eval:
         test_set = util.dataset_singleVideo(path=args.vid_path, img_format=args.im_format, transform=None)
-        test_set = RandomSampler(test_set, replacement=False, num_samples=params['num_smpls'])
+        indx = list(np.random.randint(0, len(test_set), params['num_smpls']))
+        test_set = [test_set[idx] for idx in indx]
+        print('frame numbers:{} are sampled for the validation phase'.format(indx))
+        #print(test_set[0])
         test_loader = DataLoader(test_set, batch_size=1, shuffle=True, pin_memory=True,
                                  num_workers=params['num_workers'])
     else:
@@ -142,15 +151,15 @@ if __name__ == "__main__":
         optimizer,  
         in_size, 
         util.loss_fn_singleVideo,  
-        lr_scheduler = None,
+        lr_scheduler = lr_scheduler,
         lr_warmup_scheduler=None, 
-        bnm_scheduler=None, 
+        bnm_scheduler=bnm_scheduler, 
         warmup_epoch=-1, 
         grad_norm_clip=args.clip, 
-        check_freq  = 5,
+        check_freq  = params['check_freq'],
         learning_rate= args.lr, 
-        recon_path='../recon/', 
-        ckpt_dir='../checkpoints/'
+        recon_path= args.recon_path, 
+        ckpt_dir= args.ckpt_dir
         )
 
     if args.ckpt is not None:
