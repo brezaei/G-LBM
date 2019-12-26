@@ -29,6 +29,14 @@ h_layer_5 = 2400
 """
     defining the encoder and decoder blocks
 """
+class PrintLayer(nn.Module):
+    def __init__(self):
+        super(PrintLayer, self).__init__()
+    
+    def forward(self, x):
+        # Do your print / debug stuff here
+        print(x)
+        return x
 # A block consisting of convolution, batch normalization (optional) followed by a nonlinearity (defaults to Leaky ReLU)
 class ConvUnit(nn.Module):
     def __init__(
@@ -171,11 +179,11 @@ class LR_VAE(nn.Module):
                 ConvUnitTranspose(h_layer_3, h_layer_2, self.kernel, self.stride, padding=0, out_padding=self.pad_list[2]),
                 ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, padding=0, out_padding=self.pad_list[1]),
                 ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[0], nonlinearity=nn.Tanh()))
-
+        
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 1)
+                nn.init.constant_(m.bias, 0)
             elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
                 nn.init.kaiming_normal_(m.weight)
     

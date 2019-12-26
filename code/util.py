@@ -49,7 +49,7 @@ def ConvOutSize(in_size, ConvLayNum, kernel, stride, padding):
     return (height, width), pad_list
 
 
-def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0):
+def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0, eps = 1e-1):
     """
     Prameters:
     origninal_seq [B, 1, 3, H, W] = input video frmes
@@ -63,7 +63,7 @@ def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0
     Prior of z is a spherical zero mean unit variance Gaussian
     """
     #///TODO: adding the l21-norm(recon_seq(t)-recon_seq(t-1))
-    #print("original_seg:{}, reconstructed_seq:{}, z:{}".format(original_seq.shape, recon_seq.shape, z.shape))
+    #print("original_seg:{}, reconstructed_seq:{}, z:{}".format(original_seq.shape, recon_seq.shape, z.shape)) 
     batch_size = original_seq.shape[0]
     # sqeeze all the values to [B,3, H, W]
     original_seq = original_seq.transpose(0, 1).squeeze()
@@ -71,11 +71,15 @@ def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0
     z_mean = z_mean.transpose(0, 1).squeeze()
     z_logvar = z_logvar.transpose(0, 1).squeeze()
     z = z.transpose(0, 1).squeeze()
+    #print(torch.mean(recon_seq[0, 0]), torch.mean(original_seq))
     l1 = F.l1_loss(recon_seq, original_seq, reduction='sum')
     kld = -0.5* beta * torch.sum(1 + z_logvar - torch.pow(z_mean, 2) -torch.exp(z_logvar))
     nuclear = torch.mm(z, torch.transpose(z, 0, 1))
     nuclear = torch.trace(nuclear)
-    return (l1 + kld + nuclear)/batch_size, kld/batch_size, l1/batch_size, nuclear/batch_size
+    _, s, _ = torch.svd(z, some=True, compute_uv=False)
+    rank = torch.sum(s > eps)
+    #rank = torch.tensor(1)
+    return (l1+kld+nuclear)/batch_size, kld/batch_size, l1/batch_size, nuclear/batch_size, rank
     
 def loss_fn_multipleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0):
     """
@@ -219,10 +223,15 @@ class Trainer(object):
         with tqdm.trange(self.start_epoch, n_epochs, desc='epochs') as tbar, \
                 tqdm.tqdm(total=len(train_loader), leave=False, desc='train') as pbar:
             for epoch in tbar:
+                for convLayer in self.model.conv:
+                    l = convLayer.model[0].weight
+                    print(torch.max(l), torch.min(l))
+
                 losses = []
                 klds = []
                 nuclears = []
                 l1s = []
+                ranks = []
                 #print("Running Epoch : {}".format(epoch +1))
                 for _, data in enumerate(train_loader, start=0):
                     data = data.cuda(non_blocking=True).float()
@@ -235,9 +244,26 @@ class Trainer(object):
                         cur_lr = None
                     self.optimizer.zero_grad()
                     recon_x, z_mean, z_logvar, z = self.model(data)
-                    loss, kld, l1, nuclear = self.loss_fn(data, recon_x, z_mean, z_logvar, z)
+                    loss, kld, l1, nuclear, rank = self.loss_fn(data, recon_x, z_mean, z_logvar, z)
                     loss.backward()
+                    
+                    '''if isinstance(self.model.parameters(), torch.Tensor):
+                        parameters = [self.model.parameters()]
+                    else:
+                        parameters = self.model.parameters()
+                    for p in parameters:
+                        print("before size:{}, mean value:{}, standard deviation:{}"
+                        .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))'''
                     clip_grad_norm_(self.model.parameters(), self.grad_norm_clip)
+                    '''print("\n")
+                    if isinstance(self.model.parameters(), torch.Tensor):
+                        parameters = [self.model.parameters()]
+                    else:
+                        parameters = self.model.parameters()
+                    for p in parameters:
+                        print("after size:{}, mean value:{}, standard deviation:{}"
+                        .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
+                    print("\n\n\n")'''
                     self.optimizer.step()
                     it += 1
 
@@ -245,6 +271,7 @@ class Trainer(object):
                     klds.append(kld.item())
                     l1s.append(l1.item())
                     nuclears.append(nuclear.item())
+                    ranks.append(rank.item())
                     pbar.update()
                     pbar.set_postfix(dict(total_it=it))
                     tbar.set_postfix(dict(loss = loss))
@@ -259,9 +286,10 @@ class Trainer(object):
                 meankld = np.mean(klds)
                 meanl1 = np.mean(l1s)
                 meannuclear = np.mean(nuclears)
+                meanrank = np.mean(ranks)
                 self.epoch_losses.append(meanloss)
-                print("current lr:{}, Epoch: {},  Average Loss:{}, KL of z:{}, L1 Norm:{}, Nuclear norm:{}"
-                .format(cur_lr, epoch+1, meanloss, meankld, meanl1, meannuclear))
+                print("current lr:{}, Epoch: {},  Average Loss:{}, KL of z:{}, L1 Norm:{}, Nuclear norm:{}, rank:{}"
+                .format(cur_lr, epoch+1, meanloss, meankld, meanl1, meannuclear, meanrank))
                 if (epoch+1)% self.check_freq == 0:
                     self.save_checkpoint(epoch, it)
                     self.model.eval()

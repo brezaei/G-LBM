@@ -112,4 +112,5 @@ checkpoints/
 *.png
 *.mp4
 *.npy
-
+*.pdf
+*.gv
