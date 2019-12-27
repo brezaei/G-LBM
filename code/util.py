@@ -4,7 +4,7 @@ from __future__ import (
     print_function
 )
 import numpy as np 
-import os
+import os, sys
 import glob
 import torch
 import torchvision
@@ -19,7 +19,7 @@ import tqdm
 
 __all__ = ['loss_fn_singleVideo', 'Trainer', 'ConvOutSize', 'dataset_singleVideo']
 
-
+DEBUG=False
 
 def ConvOutSize(in_size, ConvLayNum, kernel, stride, padding):
     """
@@ -49,7 +49,7 @@ def ConvOutSize(in_size, ConvLayNum, kernel, stride, padding):
     return (height, width), pad_list
 
 
-def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0, eps = 1e-1):
+def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0, eps = 1e-2):
     """
     Prameters:
     origninal_seq [B, 1, 3, H, W] = input video frmes
@@ -223,9 +223,10 @@ class Trainer(object):
         with tqdm.trange(self.start_epoch, n_epochs, desc='epochs') as tbar, \
                 tqdm.tqdm(total=len(train_loader), leave=False, desc='train') as pbar:
             for epoch in tbar:
-                for convLayer in self.model.conv:
-                    l = convLayer.model[0].weight
-                    print(torch.max(l), torch.min(l))
+                if DEBUG:
+                    for convLayer in self.model.conv:
+                        l = convLayer.model[0].weight
+                        print(torch.max(l), torch.min(l))
 
                 losses = []
                 klds = []
@@ -246,24 +247,30 @@ class Trainer(object):
                     recon_x, z_mean, z_logvar, z = self.model(data)
                     loss, kld, l1, nuclear, rank = self.loss_fn(data, recon_x, z_mean, z_logvar, z)
                     loss.backward()
-                    
-                    '''if isinstance(self.model.parameters(), torch.Tensor):
-                        parameters = [self.model.parameters()]
-                    else:
-                        parameters = self.model.parameters()
-                    for p in parameters:
-                        print("before size:{}, mean value:{}, standard deviation:{}"
-                        .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))'''
+                    if DEBUG:    
+                        if isinstance(self.model.parameters(), torch.Tensor):
+                            parameters = [self.model.parameters()]
+                        else:
+                            parameters = self.model.parameters()
+                            inf_error = False
+                            for p in parameters:
+                                print("before size:{}, mean value:{}, standard deviation:{}"
+                                .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
+                                if torch.isinf(p.grad.data.std()):
+                                    inf_error = True
+                            if inf_error:
+                                sys.exit(1)
                     clip_grad_norm_(self.model.parameters(), self.grad_norm_clip)
-                    '''print("\n")
-                    if isinstance(self.model.parameters(), torch.Tensor):
-                        parameters = [self.model.parameters()]
-                    else:
-                        parameters = self.model.parameters()
-                    for p in parameters:
-                        print("after size:{}, mean value:{}, standard deviation:{}"
-                        .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
-                    print("\n\n\n")'''
+                    if DEBUG:
+                        print("\n")
+                        # if isinstance(self.model.parameters(), torch.Tensor):
+                        #     parameters = [self.model.parameters()]
+                        # else:
+                        #     parameters = self.model.parameters()
+                        # for p in parameters:
+                        #     print("after size:{}, mean value:{}, standard deviation:{}"
+                        #     .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
+                        print("\n\n\n")
                     self.optimizer.step()
                     it += 1
 

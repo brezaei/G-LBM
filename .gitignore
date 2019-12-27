@@ -107,10 +107,11 @@ venv.bak/
 data/
 result/
 checkpoints/
-
+recon/
 #ignore variables
 *.png
 *.mp4
 *.npy
 *.pdf
 *.gv
+*.txt

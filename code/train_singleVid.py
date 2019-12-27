@@ -33,7 +33,7 @@ parser.add_argument("-weight_decay",type=float,default=0.001,help="L2 regulariza
 parser.add_argument("-lr", type=float, default=1e-3, help="Initial learning rate [default: 1e-2]")
 parser.add_argument("-lr_decay",type=float,default=0.5,help="Learning rate decay gamma [default: 0.5]")
 parser.add_argument("-decay_step_list", nargs='+', type=int,default=[50, 100, 150, 200, 250, 300],help="Learning rate decay step [default: 50, 100, 150, 200, 250, 300]")
-parser.add_argument("-clip", type=float, default=1.0, help="clip value for the gradient [default=5.0]")
+parser.add_argument("-clip", type=float, default=1.0, help="clip value for the gradient [default=1.0]")
 parser.add_argument("-im_format", type=str, default='jpg', help="image format of the video frames")
 args = parser.parse_args()
 ###############################################################
@@ -43,11 +43,11 @@ args = parser.parse_args()
 params = {
         'optimizer': 'adam',
         'shuffle': False,
-        'check_freq':20,
+        'check_freq':50,
         'num_workers': 4,
         'num_smpls':10,
         'lr_warmup':False,
-        'lr_clip':1e-5,
+        'lr_clip':1e-6,
         'warmup_min':0.0002,
         'warmup_epoch':5,
         'bn_decay':0.5,
@@ -72,7 +72,7 @@ def create_dataloader():
         test_set = [test_set[idx] for idx in indx]
         print('frame numbers:{} are sampled for the validation phase'.format(indx))
         #print(test_set[0])
-        test_loader = DataLoader(test_set, batch_size=1, shuffle=True, pin_memory=True,
+        test_loader = DataLoader(test_set, batch_size=1, shuffle=False, pin_memory=True,
                                  num_workers=params['num_workers'])
     else:
         test_loader = None
@@ -133,10 +133,10 @@ if __name__ == "__main__":
         model = nn.DataParallel(model)
     model.cuda()
 
-    x = torch.zeros(120, 3, 240, 320, dtype=torch.float, requires_grad=False, device='cuda')
-    y=model(x)
-    g=make_dot(y)
-    g.view()
+    # x = torch.zeros(120, 3, 240, 320, dtype=torch.float, requires_grad=False, device='cuda')
+    # y=model(x)
+    # g=make_dot(y)
+    # g.view()
 
     start_epoch = it = 0
     last_epoch = -1
