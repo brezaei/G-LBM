@@ -13,7 +13,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from skimage import io
 import math
-from torch.nn.utils import clip_grad_norm_
+from torch.nn.utils import clip_grad_norm_, clip_grad_value_
 import torch.optim.lr_scheduler as lr_sched
 import tqdm 
 
@@ -224,8 +224,23 @@ class Trainer(object):
                 tqdm.tqdm(total=len(train_loader), leave=False, desc='train') as pbar:
             for epoch in tbar:
                 if DEBUG:
+                    # print conv weights
                     for convLayer in self.model.conv:
                         l = convLayer.model[0].weight
+                        print(torch.max(l), torch.min(l))
+                    
+                    # print conv_fc weights
+                    l = self.model.conv_fc.model[0].weight
+                    print(torch.max(l), torch.min(l))
+
+                    # print deconv_fc weitghs
+                    for fcLayer in self.model.deconv_fc:
+                        l = fcLayer.model[0].weight
+                        print(torch.max(l), torch.min(l))
+
+                    # print deconv weitghs
+                    for deconvLayer in self.model.deconv:
+                        l = deconvLayer.model[0].weight
                         print(torch.max(l), torch.min(l))
 
                 losses = []
@@ -243,8 +258,11 @@ class Trainer(object):
                         cur_lr = self.lr_scheduler.get_lr()[0]
                     else:
                         cur_lr = None
+                    # self.model.zero_grad()
                     self.optimizer.zero_grad()
                     recon_x, z_mean, z_logvar, z = self.model(data)
+                    # print("z_mean:{}, z_var:{}, z:{}".format(torch.mean(z_mean.squeeze(0), axis=0),
+                    #  torch.mean(z_logvar.squeeze(0), axis=0),torch.mean(z.squeeze(0), axis=0)))
                     loss, kld, l1, nuclear, rank = self.loss_fn(data, recon_x, z_mean, z_logvar, z)
                     loss.backward()
                     if DEBUG:    
@@ -281,8 +299,9 @@ class Trainer(object):
                     ranks.append(rank.item())
                     pbar.update()
                     pbar.set_postfix(dict(total_it=it))
-                    tbar.set_postfix(dict(loss = loss))
+                    tbar.set_postfix(dict(loss = loss.item(), kld=kld.item(), l1=l1.item(), nuclear=nuclear.item()))
                     tbar.refresh()
+                    #print(dict(loss = loss.item(), kld=kld.item(), l1=l1.item(), nuclear=nuclear.item()))
                 if self.lr_scheduler is not None and self.warmup_epoch <= epoch:
                     self.lr_scheduler.step(epoch)
 

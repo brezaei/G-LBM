@@ -61,6 +61,9 @@ def create_dataloader():
 
     # create dataloader
     train_set = util.dataset_singleVideo(path=args.vid_path, img_format=args.im_format, transform=None)
+    if len(train_set) > 10000:
+        train_set = [train_set[idx] for idx in range(10000)]
+
     train_loader = DataLoader(train_set, batch_size=args.batch_size, pin_memory=True,
                               num_workers=params['num_workers'], shuffle=False, drop_last=True)
 
@@ -110,6 +113,7 @@ def create_scheduler(optimizer, total_steps, last_epoch):
 
 ###########################################################################
 if __name__ == "__main__":
+    torch.manual_seed(2020)
     gpu_list = os.environ['CUDA_VISIBLE_DEVICES'] if 'CUDA_VISIBLE_DEVICES' in os.environ.keys() else 'ALL'
     print('CUDA_VISIBLE_DEVICES=%s' % gpu_list)    
 # find the size of the input frames
