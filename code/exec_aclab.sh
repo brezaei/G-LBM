@@ -21,7 +21,7 @@
 
 echo "--------------------------"
 lr=0.0015
-alpha=2000
+alpha=20
 epochs=1000
 recon_path="../output/recon/BMC2012/Video_00$1"
 ckpt_dir="../output/checkpoints/BMC2012/Video_00$1"

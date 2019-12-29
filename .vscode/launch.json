@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "node",
+            "request": "launch",
+            "name": "Gulp task",
+            "program": "${workspaceFolder}/node_modules/gulp/bin/gulp.js",
+            "args": [
+                "task"
+            ],
+            "skipFiles": [
+                "<node_internals>/**"
+            ]
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "subProcess": true,
+            "args": ["-lr", "0.0015",  "-epochs", "100" , "-clip", "1" ,
+                "-decay_step_list", "50", "100", "150", "200", "250", "300", "350", "400", "450", "500",
+                "-vid_path", "/media/behnaz/My Book/BackgroundSubtraction/Data/BMC2012/Video_002/frames", 
+                "--train_with_eval", "-ckpt_dir", "../output/checkpoints/BMC2012/Video_002",
+                "-recon_path", "../output/recon/BMC2012/Video_002/images"
+            ]
+        }
+    ]
+}

@@ -182,10 +182,18 @@ class LR_VAE(nn.Module):
         
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
-                nn.init.constant_(m.weight, 1)
-                nn.init.constant_(m.bias, 0)
+                nn.init.normal_(m.weight, 1.0)
+                nn.init.constant_(m.bias, 0.0)
+                print("==============initializing weights===============")
             elif isinstance(m, nn.Conv2d) or isinstance(m, nn.ConvTranspose2d) or isinstance(m, nn.Linear):
-                nn.init.kaiming_normal_(m.weight)
+                if hasattr(m, 'bias') and m.bias is not None:
+                    nn.init.constant_(m.bias, 0.0)
+                if isinstance(m, nn.ConvTranspose2d):
+                    if m.out_channels == 3 and m.in_channels == h_layer_1:
+                        nn.init.xavier_normal_(m.weight, gain=1)
+                        print("xavier happend")
+                else:
+                    nn.init.kaiming_normal_(m.weight, a=0.2,nonlinearity='leaky_relu')
     
     def encoder(self, x):
         # The frames are unrolled into the batch dimension for batch processing such that x goes from
