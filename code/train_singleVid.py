@@ -1,3 +1,6 @@
+import multiprocessing
+multiprocessing.set_start_method('spawn', True)
+
 import torch
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_sched
@@ -43,7 +46,7 @@ args = parser.parse_args()
 params = {
         'optimizer': 'adam',
         'shuffle': False,
-        'check_freq':50,
+        'check_freq':30,
         'num_workers': 4,
         'num_smpls':10,
         'lr_warmup':False,
@@ -113,7 +116,7 @@ def create_scheduler(optimizer, total_steps, last_epoch):
 
 ###########################################################################
 if __name__ == "__main__":
-    torch.manual_seed(2020)
+    # torch.manual_seed(2020)
     gpu_list = os.environ['CUDA_VISIBLE_DEVICES'] if 'CUDA_VISIBLE_DEVICES' in os.environ.keys() else 'ALL'
     print('CUDA_VISIBLE_DEVICES=%s' % gpu_list)    
 # find the size of the input frames
@@ -180,4 +183,4 @@ if __name__ == "__main__":
     if args.ckpt is not None:
         trainer.load_ckeckpoint(load_checkpoint_path=args.ckpt)
 
-    trainer.train_model(args.epochs, train_loader, test_loader = test_loader)
+    trainer.train_model(args.epochs, train_loader, test_loader = test_loader, alpha=args.alpha)

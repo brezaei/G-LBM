@@ -74,9 +74,10 @@ def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0
     #print(torch.mean(recon_seq[0, 0]), torch.mean(original_seq))
     l1 = F.l1_loss(recon_seq, original_seq, reduction='sum')
     kld = -0.5* beta * torch.sum(1 + z_logvar - torch.pow(z_mean, 2) -torch.exp(z_logvar))
-    nuclear = torch.mm(z, torch.transpose(z, 0, 1))
-    nuclear = torch.trace(nuclear)
-    _, s, _ = torch.svd(z, some=True, compute_uv=False)
+    #nuclear = torch.mm(z, torch.transpose(z, 0, 1))
+    #nuclear = torch.trace(nuclear)
+    _, s, _ = torch.svd(z, some=True, compute_uv=True)
+    nuclear = alpha * torch.sum(s)
     rank = torch.sum(s > eps)
     #rank = torch.tensor(1)
     return (l1+kld+nuclear)/batch_size, kld/batch_size, l1/batch_size, nuclear/batch_size, rank
@@ -217,39 +218,45 @@ class Trainer(object):
             image = image.view(2,3, self.im_size[0], self.im_size[1])
             os.makedirs(os.path.dirname('{}/epoch{}_sample{}.png'.format(self.recon_path, epoch, sample_id)), exist_ok=True)
             torchvision.utils.save_image(image, '{}/epoch{}_sample{}.png'.format(self.recon_path, epoch, sample_id))
-    def train_model(self, n_epochs, train_loader, test_loader=None):
+    def train_model(self, n_epochs, train_loader, test_loader=None, alpha=1.0):
         it = self.start_it
         self.model.train()
         with tqdm.trange(self.start_epoch, n_epochs, desc='epochs') as tbar, \
                 tqdm.tqdm(total=len(train_loader), leave=False, desc='train') as pbar:
             for epoch in tbar:
-                if DEBUG:
-                    # print conv weights
-                    for convLayer in self.model.conv:
-                        l = convLayer.model[0].weight
-                        print(torch.max(l), torch.min(l))
-                    
-                    # print conv_fc weights
-                    l = self.model.conv_fc.model[0].weight
-                    print(torch.max(l), torch.min(l))
-
-                    # print deconv_fc weitghs
-                    for fcLayer in self.model.deconv_fc:
-                        l = fcLayer.model[0].weight
-                        print(torch.max(l), torch.min(l))
-
-                    # print deconv weitghs
-                    for deconvLayer in self.model.deconv:
-                        l = deconvLayer.model[0].weight
-                        print(torch.max(l), torch.min(l))
-
                 losses = []
                 klds = []
                 nuclears = []
                 l1s = []
                 ranks = []
-                #print("Running Epoch : {}".format(epoch +1))
+                print("Running Epoch : {}".format(epoch +1))
                 for _, data in enumerate(train_loader, start=0):
+                    if DEBUG:
+                        print("\n\n\n---------------- Running Iteration : {}".format(it))
+                        print("WEIGHTS WEIGHTS WEIGHTS WEIGHTS WEIGHTS WEIGHTS ")
+                        # print conv weights
+                        print("\nconv:")
+                        for convLayer in self.model.conv:
+                            l = convLayer.model[0].weight
+                            print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
+                        
+                        # print conv_fc weights
+                        print("\nconv_fc:")
+                        l = self.model.conv_fc.model[0].weight
+                        print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
+
+                        # print deconv_fc weitghs
+                        print("\ndeconv_fc:")
+                        for fcLayer in self.model.deconv_fc:
+                            l = fcLayer.model[0].weight
+                            print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
+
+                        # print deconv weitghs
+                        print("\ndeconv:")
+                        for deconvLayer in self.model.deconv:
+                            l = deconvLayer.model[0].weight
+                            print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
+
                     data = data.cuda(non_blocking=True).float()
                     if self.lr_warmup_scheduler is not None and epoch < self.warmup_epoch:
                         self.lr_warmup_scheduler.step(it)
@@ -263,31 +270,33 @@ class Trainer(object):
                     recon_x, z_mean, z_logvar, z = self.model(data)
                     # print("z_mean:{}, z_var:{}, z:{}".format(torch.mean(z_mean.squeeze(0), axis=0),
                     #  torch.mean(z_logvar.squeeze(0), axis=0),torch.mean(z.squeeze(0), axis=0)))
-                    loss, kld, l1, nuclear, rank = self.loss_fn(data, recon_x, z_mean, z_logvar, z)
+                    loss, kld, l1, nuclear, rank = self.loss_fn(data, recon_x, z_mean, z_logvar, z, alpha=alpha)
                     loss.backward()
-                    if DEBUG:    
+                    if DEBUG:
+                        print("\nGRADS GRADS GRADS GRADS GRADS GRADS GRADS GRADS \n")
                         if isinstance(self.model.parameters(), torch.Tensor):
                             parameters = [self.model.parameters()]
                         else:
                             parameters = self.model.parameters()
                             inf_error = False
                             for p in parameters:
-                                print("before size:{}, mean value:{}, standard deviation:{}"
+                                print("before clip size:{}, mean value:{}, standard deviation:{}"
                                 .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
                                 if torch.isinf(p.grad.data.std()):
                                     inf_error = True
                             if inf_error:
-                                sys.exit(1)
+                                print("\nINF GRAD DETECTED!!\n")
+                                # sys.exit(1)
                     clip_grad_norm_(self.model.parameters(), self.grad_norm_clip)
                     if DEBUG:
                         print("\n")
-                        # if isinstance(self.model.parameters(), torch.Tensor):
-                        #     parameters = [self.model.parameters()]
-                        # else:
-                        #     parameters = self.model.parameters()
-                        # for p in parameters:
-                        #     print("after size:{}, mean value:{}, standard deviation:{}"
-                        #     .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
+                        if isinstance(self.model.parameters(), torch.Tensor):
+                            parameters = [self.model.parameters()]
+                        else:
+                            parameters = self.model.parameters()
+                        for p in parameters:
+                            print("after clip size:{}, mean value:{}, standard deviation:{}"
+                            .format(p.grad.data.shape, p.grad.data.mean(), p.grad.data.std()))
                         print("\n\n\n")
                     self.optimizer.step()
                     it += 1
@@ -297,11 +306,13 @@ class Trainer(object):
                     l1s.append(l1.item())
                     nuclears.append(nuclear.item())
                     ranks.append(rank.item())
+                    if DEBUG:
+                        print("LOSS LOSS LOSS LOSS LOSS LOSS LOSS LOSS ")
+                        print(dict(loss = loss.item(), kld=kld.item(), l1=l1.item(), nuclear=nuclear.item()))
                     pbar.update()
                     pbar.set_postfix(dict(total_it=it))
                     tbar.set_postfix(dict(loss = loss.item(), kld=kld.item(), l1=l1.item(), nuclear=nuclear.item()))
                     tbar.refresh()
-                    #print(dict(loss = loss.item(), kld=kld.item(), l1=l1.item(), nuclear=nuclear.item()))
                 if self.lr_scheduler is not None and self.warmup_epoch <= epoch:
                     self.lr_scheduler.step(epoch)
 
