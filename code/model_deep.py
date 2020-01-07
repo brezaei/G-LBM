@@ -28,6 +28,7 @@ h_layer_3 = 128
 h_layer_4 = 128
 h_layer_5 = 2400
 h_layer_6 = 1200
+
 """
     defining the encoder and decoder blocks
 """
@@ -37,6 +38,7 @@ activation_map = {
     'Tanh':'tanh',
     'LeakyReLU':'leaky_relu'
 }
+
 class PrintLayer(nn.Module):
     def __init__(self):
         super(PrintLayer, self).__init__()
@@ -54,7 +56,7 @@ class ConvUnit(nn.Module):
         kernel, 
         stride= 1, 
         padding=0, 
-        batchnorm: bool = False,
+        batchnorm: bool = True,
         bias: bool = True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
@@ -96,7 +98,7 @@ class ConvUnitTranspose(nn.Module):
         stride=1, 
         padding=0, 
         out_padding=0, 
-        batchnorm: bool = False,
+        batchnorm: bool = True,
         bias:bool=True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
@@ -125,14 +127,16 @@ class ConvUnitTranspose(nn.Module):
             
     def forward(self, x):
         return self.model(x)
-
+class Flatten(nn.Module):
+    def forward(self, input):
+        return input.view(input.size(0), -1)
 # A block consisting of an affine layer, batch normalization (optional) followed by a nonlinearity (defaults to Leaky ReLU)
 class LinearUnit(nn.Module):
     def __init__(
         self, 
         in_features, 
         out_features, 
-        batchnorm: bool = False, 
+        batchnorm: bool = True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
         super(LinearUnit, self).__init__()
@@ -140,6 +144,7 @@ class LinearUnit(nn.Module):
             self.model = nn.Sequential(
                 OrderedDict([
                     ('linear', nn.Linear(in_features, out_features, bias= False)),
+                    ('flt', Flatten()),
                     ('bn', nn.BatchNorm1d(out_features)), 
                     ('nl', nonlinearity)
                 ])
@@ -163,41 +168,42 @@ class LinearUnit(nn.Module):
 
 # defining the VAE model
 class LR_VAE(nn.Module):
-    r"""Network Architecture:
+    r"""
+    Network Architecture:
         PRIOR OF Z:
             The prior of z is a Gaussian with mean 0 and variance I
         CONVOLUTIONAL ENCODER FOR CONDITIONAL DISTRIBUTION q(z|x):
             The convolutional encoder consists of 4 convolutional layers with 256 layers and a kernel size of 4 
             Each convolution is followed by a batch normalization layer and a LeakyReLU(0.2) nonlinearity. 
-            For the 3,64,64 frames (all image dimensions are in channel, width, height) in the sprites dataset the following dimension changes take place
+            For the 3,320,240 frames (all image dimensions are in channel, width, height) in the BMC2012 dataset the following dimension changes take place
             
             3,320,240 ->  ->  ->  ->  (where each -> consists of a convolution, batch normalization followed by LeakyReLU(0.2))
 
-            The 8,8,256 tensor is unrolled into a vector of size 8*8*256 which is then made to undergo the following tansformations
+            The 8,13,128 tensor is unrolled into a vector of size 8*13*128 which is then made to undergo the following tansformations
             
-             ->  ->  (where each -> consists of an affine transformation, batch normalization followed by LeakyReLU(0.2))
+             ->  ->  (where each -> consists of an affine transformation, batch normalization followed by Tanh())
 
         CONVOLUTIONAL DECODER FOR CONDITIONAL DISTRIBUTION p(x| z)
-            The architecture is symmetric to that of the convolutional encoder. The vector f is concatenated to each z_t, which then undergoes two subsequent
+            The architecture is symmetric to that of the convolutional encoder. The vector z undergoes two subsequent
             affine transforms, causing the following change in dimensions
             
              ->  ->  (where each -> consists of an affine transformation, batch normalization followed by LeakyReLU(0.2))
 
-            The 8*8*256 tensor is reshaped into a tensor of shape 256,8,8 and then undergoes the following dimension changes 
+            The 8*13*256 tensor is reshaped into a tensor of shape 8, 13, 128 and then undergoes the following dimension changes 
 
              ->  ->  ->  -> 3,320,240 (where each -> consists of a transposed convolution, batch normalization followed by LeakyReLU(0.2)
-            with the exception of the last layer that does not have batchnorm and uses tanh nonlinearity)
+            with the exception of the last layer that does not have batchnorm and uses Sigmoid nonlinearity)
 
     Hyperparameters:
-        z_dim: Dimension of the background encoding of a frame z. z has the shape (batch_size, z_dim)   
+        z_dim: Dimension of the background encoding of a frame. z has the shape (batch_size, z_dim)   
         nonlinearity: Nonlinearity used in convolutional and deconvolutional layers, defaults to LeakyReLU(0.2)
         in_size: (Height and width) of each frame in the video
         h_layer_*: Number of channels in the convolutional and deconvolutional layers
-        conv_dim: The convolutional encoder converts each frame into an intermediate encoding vector of size conv_dim, i.e,
-                  The initial video tensor (batch_size, num_channels, in_size[0], in_size[1]) is converted to (batch_size, conv_dim)
+        final_conv_size: The convolutional encoder converts each frame into an intermediate encoding vector of size final_conv_size, i.e,
+                  The initial video tensor (batch_size, num_channels, in_size[0], in_size[1]) is converted to (batch_size, final_conv_size)
 
     Optimization:
-        The model is trained with the Adam optimizer with a learning rate of 0.0001, betas of 0.9 and 0.999, with a batch size of 120 for 200 epochs
+        The model is trained with the Adam optimizer with a learning rate of 1.5e-3 down to 1e-6 with a batch size of 120 for 500 epochs
 
     """
     def __init__(self, kernel=4, stride =2, z_dim=120, in_size=(320,240),
@@ -225,15 +231,15 @@ class LR_VAE(nn.Module):
         self.conv_fc = nn.Sequential(LinearUnit(h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), h_layer_5),
                 LinearUnit(h_layer_5, h_layer_6))
 
-        self.deconv_fc = nn.Sequential(LinearUnit(self.z_dim, h_layer_6, batchnorm=False),
-                LinearUnit(h_layer_6, h_layer_5, batchnorm=False),
-                LinearUnit(h_layer_5, h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), batchnorm=False))
+        self.deconv_fc = nn.Sequential(LinearUnit(self.z_dim, h_layer_6),
+                LinearUnit(h_layer_6, h_layer_5),
+                LinearUnit(h_layer_5, h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1])))
         #///TODO: try the nn.Tanh() as the nonlinearity, it scales the output in [-1, 1] compared to sigmoid which is [0, 1]
         self.deconv = nn.Sequential(
                 ConvUnitTranspose(h_layer_4, h_layer_3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[3]),
                 ConvUnitTranspose(h_layer_3, h_layer_2, self.kernel, self.stride, padding=0, out_padding=self.pad_list[2]),
                 ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, padding=0, out_padding=self.pad_list[1]),
-                ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[0], nonlinearity=nn.Sigmoid()))
+                ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[0], batchnorm=False, nonlinearity=nn.Sigmoid()))
         
         '''for m in self.modules():
             if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
