@@ -8,6 +8,7 @@
 #SBATCH --mem=64Gb
 #SBATCH --gres=gpu:k40m:1
 #SBATCH --output=result_bs.%j.out
+#SBATCH --exclude=c[2138-2175]
 
 module load cuda/9.2
 module load anaconda3/3.7
@@ -23,10 +24,12 @@ echo "--------------------------"
 lr=0.0015
 alpha=200
 epochs=500
-recon_path="../output/recon/BMC2012/Video_00$1"
-ckpt_dir="../output/checkpoints/BMC2012/Video_00$1"
-vid_path="/scratch/rezaei.b/BackgroundSubtraction/Data/BMC2012/Video_00$1/frames"
+recon_path="../output/recon/SBMnet2016/$1"
+ckpt_dir="../output/checkpoints/SBMnet2016/$1"
+vid_path="/scratch/rezaei.b/BackgroundSubtraction/Data/SBMnet2016/$1/input"
+batch_size=120
 
+rm ${recon_path}/images/*.png
 mkdir -p $recon_path
 mkdir -p $ckpt_dir
 

@@ -64,8 +64,8 @@ def create_dataloader():
 
     # create dataloader
     train_set = util.dataset_singleVideo(path=args.vid_path, img_format=args.im_format, transform=None)
-    if len(train_set) > 10000:
-        train_set = [train_set[idx] for idx in range(10000)]
+    if len(train_set) > 11000:
+        train_set = [train_set[idx] for idx in range(11000)]
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, pin_memory=True,
                               num_workers=params['num_workers'], shuffle=False, drop_last=True)
