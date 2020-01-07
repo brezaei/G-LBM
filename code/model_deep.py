@@ -19,6 +19,7 @@ from util import *
 from torch.nn import Parameter
 import torch.utils.data
 from torch import nn, optim
+from collections import OrderedDict
 
 # parameters of the encoder and decoder
 h_layer_1 = 32
@@ -26,9 +27,16 @@ h_layer_2 = 64
 h_layer_3 = 128
 h_layer_4 = 128
 h_layer_5 = 2400
+h_layer_6 = 1200
 """
     defining the encoder and decoder blocks
 """
+activation_map = {
+    'ReLU': 'relu',
+    'Sigmoid':'sigmoid',
+    'Tanh':'tanh',
+    'LeakyReLU':'leaky_relu'
+}
 class PrintLayer(nn.Module):
     def __init__(self):
         super(PrintLayer, self).__init__()
@@ -47,17 +55,34 @@ class ConvUnit(nn.Module):
         stride= 1, 
         padding=0, 
         batchnorm: bool = False,
-        bias: bool = False, 
+        bias: bool = True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
         super(ConvUnit, self).__init__()
         bias = bias and (not batchnorm)
         if batchnorm is True:
             self.model = nn.Sequential(
-                    nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias),
-                    nn.BatchNorm2d(out_channels), nonlinearity)
+                OrderedDict([
+                    ('conv', nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias)),
+                    ('bn', nn.BatchNorm2d(out_channels)),
+                    ('nl', nonlinearity)
+                ])
+            )
+            nn.init.xavier_normal_(self.model.conv.weight, nn.init.calculate_gain(activation_map[nonlinearity.__class__.__name__]))
+            nn.init.normal_(self.model.bn.weight, 1.0)
+            nn.init.constant_(self.model.bn.bias, 0.0)
+
         else:
-            self.model = nn.Sequential(nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias), nonlinearity)
+            self.model = nn.Sequential(
+                OrderedDict([
+                    ('conv', nn.Conv2d(in_channels, out_channels, kernel, stride, padding, bias=bias)), 
+                    ('nl', nonlinearity)
+                ])
+            )
+            nn.init.xavier_normal_(self.model.conv.weight, nn.init.calculate_gain(activation_map[nonlinearity.__class__.__name__]))
+            nn.init.constant_(self.model.conv.bias, 0.0)
+
+
     def forward(self, x):
         return self.model(x)
 
@@ -71,7 +96,7 @@ class ConvUnitTranspose(nn.Module):
         stride=1, 
         padding=0, 
         out_padding=0, 
-        batchnorm:bool=False,
+        batchnorm: bool = False,
         bias:bool=True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
@@ -79,10 +104,25 @@ class ConvUnitTranspose(nn.Module):
         bias = bias and (not batchnorm)
         if batchnorm is True:
             self.model = nn.Sequential(
-                    nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding, bias=bias),
-                    nn.BatchNorm2d(out_channels), nonlinearity)
+                OrderedDict([
+                    ('deconv', nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding, bias=bias)),
+                    ('bn', nn.BatchNorm2d(out_channels)), 
+                    ('nl', nonlinearity)
+                ])
+            )
+            nn.init.xavier_normal_(self.model.deconv.weight, nn.init.calculate_gain(activation_map[nonlinearity.__class__.__name__]))
+            nn.init.normal_(self.model.bn.weight, 1.0)
+            nn.init.constant_(self.model.bn.bias, 0.0)
         else:
-            self.model = nn.Sequential(nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding, bias=bias), nonlinearity)
+            self.model = nn.Sequential(
+                OrderedDict([
+                    ('deconv', nn.ConvTranspose2d(in_channels, out_channels, kernel, stride, padding, out_padding, bias=bias)), 
+                    ('nl', nonlinearity)
+                ])
+            )
+            nn.init.xavier_normal_(self.model.deconv.weight, nn.init.calculate_gain(activation_map[nonlinearity.__class__.__name__]))
+            nn.init.constant_(self.model.deconv.bias, 0.0)
+            
     def forward(self, x):
         return self.model(x)
 
@@ -92,17 +132,30 @@ class LinearUnit(nn.Module):
         self, 
         in_features, 
         out_features, 
-        batchnorm:bool=False, 
+        batchnorm: bool = False, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
         super(LinearUnit, self).__init__()
         if batchnorm is True:
             self.model = nn.Sequential(
-                    nn.Linear(in_features, out_features, bias= False),
-                    nn.BatchNorm1d(out_features), nonlinearity)
+                OrderedDict([
+                    ('linear', nn.Linear(in_features, out_features, bias= False)),
+                    ('bn', nn.BatchNorm1d(out_features)), 
+                    ('nl', nonlinearity)
+                ])
+            )
+            nn.init.xavier_normal_(self.model.linear.weight, nn.init.calculate_gain(activation_map[nonlinearity.__class__.__name__]))
+            nn.init.normal_(self.model.bn.weight, 1.0)
+            nn.init.constant_(self.model.bn.bias, 0.0)
         else:
             self.model = nn.Sequential(
-                    nn.Linear(in_features, out_features, bias=True), nonlinearity)
+                OrderedDict([
+                    ('linear', nn.Linear(in_features, out_features, bias=True)), 
+                    ('nl', nonlinearity)
+                ])
+            )
+            nn.init.xavier_normal_(self.model.linear.weight, nn.init.calculate_gain(activation_map[nonlinearity.__class__.__name__]))
+            nn.init.constant_(self.model.linear.bias, 0.0)
 
     def forward(self, x):
         return self.model(x)
@@ -158,8 +211,8 @@ class LR_VAE(nn.Module):
         self.nl = nn.LeakyReLU(0.2) if nonlinearity is None else nonlinearity
 
         # ///TODO: Check if only one affine transform is sufficient.
-        self.z_mean = LinearUnit(h_layer_5, self.z_dim, batchnorm=False)
-        self.z_logvar = LinearUnit(h_layer_5, self.z_dim, batchnorm=False)
+        self.z_mean = LinearUnit(h_layer_6, self.z_dim, nonlinearity=nn.Tanh())
+        self.z_logvar = LinearUnit(h_layer_6, self.z_dim, nonlinearity=nn.Tanh())
         # ///TODO: check if it is better to add padding in here instead of output padding in deconv
         self.conv = nn.Sequential(
                 ConvUnit(3, h_layer_1, self.kernel, self.stride), 
@@ -169,10 +222,12 @@ class LR_VAE(nn.Module):
                 )
         self.final_conv_size, self.pad_list = ConvOutSize(in_size, 4 , self.kernel, self.stride, 0)
 
-        self.conv_fc = LinearUnit(h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), h_layer_5)
+        self.conv_fc = nn.Sequential(LinearUnit(h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), h_layer_5),
+                LinearUnit(h_layer_5, h_layer_6))
 
-        self.deconv_fc = nn.Sequential(LinearUnit(self.z_dim, h_layer_5, batchnorm=False),
-                LinearUnit(h_layer_5, h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), False))
+        self.deconv_fc = nn.Sequential(LinearUnit(self.z_dim, h_layer_6, batchnorm=False),
+                LinearUnit(h_layer_6, h_layer_5, batchnorm=False),
+                LinearUnit(h_layer_5, h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), batchnorm=False))
         #///TODO: try the nn.Tanh() as the nonlinearity, it scales the output in [-1, 1] compared to sigmoid which is [0, 1]
         self.deconv = nn.Sequential(
                 ConvUnitTranspose(h_layer_4, h_layer_3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[3]),
@@ -180,7 +235,7 @@ class LR_VAE(nn.Module):
                 ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, padding=0, out_padding=self.pad_list[1]),
                 ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[0], nonlinearity=nn.Sigmoid()))
         
-        for m in self.modules():
+        '''for m in self.modules():
             if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):
                 nn.init.normal_(m.weight, 1.0)
                 nn.init.constant_(m.bias, 0.0)
@@ -190,11 +245,11 @@ class LR_VAE(nn.Module):
                     nn.init.constant_(m.bias, 0.0)
                 if isinstance(m, nn.ConvTranspose2d):
                     if m.out_channels == 3 and m.in_channels == h_layer_1:
-                        nn.init.xavier_normal_(m.weight, gain=1)
+                        nn.init.xavier_normal__(m.weight, gain=1)
                         print("xavier happend")
                 else:
                     nn.init.kaiming_normal_(m.weight, a=0.2,nonlinearity='leaky_relu')
-    
+        '''
     def encoder(self, x):
         # The frames are unrolled into the batch dimension for batch processing such that x goes from
         # [batch_size, frames, channels, height, width] to [batch_size * frames, channels, height, width]
@@ -231,11 +286,3 @@ class LR_VAE(nn.Module):
         z_mean, z_logvar = self.encoder(x)
         z = self.reparam(z_mean, z_logvar)
         return self.decoder(z), z_mean, z_logvar, z
-
-
-
-
-
-        
-
-

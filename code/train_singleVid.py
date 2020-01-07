@@ -14,7 +14,7 @@ from skimage import io
 import torchvision
 import matplotlib.pyplot as plt
 
-from model import LR_VAE
+from model_deep import LR_VAE
 import util 
 
 from torchviz import make_dot

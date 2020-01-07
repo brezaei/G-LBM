@@ -49,7 +49,7 @@ def ConvOutSize(in_size, ConvLayNum, kernel, stride, padding):
     return (height, width), pad_list
 
 
-def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0, eps = 1e-2):
+def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0, eps = 1e-5):
     """
     Prameters:
     origninal_seq [B, 1, 3, H, W] = input video frmes
@@ -74,13 +74,18 @@ def loss_fn_singleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0
     #print(torch.mean(recon_seq[0, 0]), torch.mean(original_seq))
     l1 = F.l1_loss(recon_seq, original_seq, reduction='sum')
     kld = -0.5* beta * torch.sum(1 + z_logvar - torch.pow(z_mean, 2) -torch.exp(z_logvar))
+    if DEBUG:
+        print(torch.max(z_logvar).item())
+        print("z_logvar: {}-{}, torch.pow(z_mean, 2): {}, torch.exp(z_logvar):{}".format(torch.mean(z_logvar).item(), torch.std(z_logvar).item(), torch.mean(torch.pow(z_mean, 2)).item(), torch.mean(torch.exp(z_logvar)).item()))
     #nuclear = torch.mm(z, torch.transpose(z, 0, 1))
     #nuclear = torch.trace(nuclear)
-    _, s, _ = torch.svd(z, some=True, compute_uv=True)
-    nuclear = alpha * torch.sum(s)
-    rank = torch.sum(s > eps)
-    #rank = torch.tensor(1)
-    return (l1+kld+nuclear)/batch_size, kld/batch_size, l1/batch_size, nuclear/batch_size, rank
+    _, sm, _ = torch.svd(z_mean, some=True, compute_uv=True)
+    _, sv, _ = torch.svd(z_logvar,some=True, compute_uv=True)
+    nuclear = alpha * (torch.sum(sm)+torch.sum(sv))
+    rank_m = torch.sum(sm > eps)
+    rank_v = torch.sum(sv > eps)
+    # print("Singular matrix(size={}): {}".format(s.shape, s))
+    return (l1+kld+nuclear)/batch_size, kld/batch_size, l1/batch_size, nuclear/batch_size, rank_m, rank_v
     
 def loss_fn_multipleVideo(original_seq, recon_seq, z_mean, z_logvar, z, beta = 1.0, alpha=1.0):
     """
@@ -228,8 +233,10 @@ class Trainer(object):
                 klds = []
                 nuclears = []
                 l1s = []
-                ranks = []
-                print("Running Epoch : {}".format(epoch +1))
+                ranks_m = []
+                ranks_v = []
+                if DEBUG:
+                    print("Running Epoch : {}".format(epoch +1))
                 for _, data in enumerate(train_loader, start=0):
                     if DEBUG:
                         print("\n\n\n---------------- Running Iteration : {}".format(it))
@@ -242,8 +249,9 @@ class Trainer(object):
                         
                         # print conv_fc weights
                         print("\nconv_fc:")
-                        l = self.model.conv_fc.model[0].weight
-                        print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
+                        for fcLayer in self.model.conv_fc:
+                            l = fcLayer.model[0].weight
+                            print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
 
                         # print deconv_fc weitghs
                         print("\ndeconv_fc:")
@@ -270,7 +278,7 @@ class Trainer(object):
                     recon_x, z_mean, z_logvar, z = self.model(data)
                     # print("z_mean:{}, z_var:{}, z:{}".format(torch.mean(z_mean.squeeze(0), axis=0),
                     #  torch.mean(z_logvar.squeeze(0), axis=0),torch.mean(z.squeeze(0), axis=0)))
-                    loss, kld, l1, nuclear, rank = self.loss_fn(data, recon_x, z_mean, z_logvar, z, alpha=alpha)
+                    loss, kld, l1, nuclear, rank_m, rank_v = self.loss_fn(data, recon_x, z_mean, z_logvar, z, alpha=alpha)
                     loss.backward()
                     if DEBUG:
                         print("\nGRADS GRADS GRADS GRADS GRADS GRADS GRADS GRADS \n")
@@ -305,7 +313,8 @@ class Trainer(object):
                     klds.append(kld.item())
                     l1s.append(l1.item())
                     nuclears.append(nuclear.item())
-                    ranks.append(rank.item())
+                    ranks_m.append(rank_m.item())
+                    ranks_v.append(rank_v.item())
                     if DEBUG:
                         print("LOSS LOSS LOSS LOSS LOSS LOSS LOSS LOSS ")
                         print(dict(loss = loss.item(), kld=kld.item(), l1=l1.item(), nuclear=nuclear.item()))
@@ -323,10 +332,11 @@ class Trainer(object):
                 meankld = np.mean(klds)
                 meanl1 = np.mean(l1s)
                 meannuclear = np.mean(nuclears)
-                meanrank = np.mean(ranks)
+                meanrank_m = np.mean(ranks_m)
+                meanrank_v = np.mean(ranks_v)
                 self.epoch_losses.append(meanloss)
-                print("current lr:{}, Epoch: {},  Average Loss:{}, KL of z:{}, L1 Norm:{}, Nuclear norm:{}, rank:{}"
-                .format(cur_lr, epoch+1, meanloss, meankld, meanl1, meannuclear, meanrank))
+                print("current lr:{}, Epoch: {},  Average Loss:{}, KL of z:{}, L1 Norm:{}, Nuclear norm:{}, rank_m:{}, rank_v:{}"
+                .format(cur_lr, epoch+1, meanloss, meankld, meanl1, meannuclear, meanrank_m, meanrank_v))
                 if (epoch+1)% self.check_freq == 0:
                     self.save_checkpoint(epoch, it)
                     self.model.eval()

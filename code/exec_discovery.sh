@@ -21,8 +21,8 @@ nvidia-smi
 
 echo "--------------------------"
 lr=0.0015
-alpha=2000
-epochs=1000
+alpha=200
+epochs=500
 recon_path="../output/recon/BMC2012/Video_00$1"
 ckpt_dir="../output/checkpoints/BMC2012/Video_00$1"
 vid_path="/scratch/rezaei.b/BackgroundSubtraction/Data/BMC2012/Video_00$1/frames"
