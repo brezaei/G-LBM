@@ -119,3 +119,5 @@ output_*/
 *.avi
 *.gif
 *.pth
+# vscode 
+.vscode/
