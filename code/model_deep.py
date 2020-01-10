@@ -56,7 +56,7 @@ class ConvUnit(nn.Module):
         kernel, 
         stride= 1, 
         padding=0, 
-        batchnorm: bool = True,
+        batchnorm: bool = False,
         bias: bool = True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
@@ -98,7 +98,7 @@ class ConvUnitTranspose(nn.Module):
         stride=1, 
         padding=0, 
         out_padding=0, 
-        batchnorm: bool = True,
+        batchnorm: bool = False,
         bias:bool=True, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
@@ -136,7 +136,7 @@ class LinearUnit(nn.Module):
         self, 
         in_features, 
         out_features, 
-        batchnorm: bool = True, 
+        batchnorm: bool = False, 
         nonlinearity=nn.LeakyReLU(0.2)
         ):
         super(LinearUnit, self).__init__()
