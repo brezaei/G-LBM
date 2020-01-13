@@ -68,7 +68,7 @@ def create_dataloader():
         train_set = [train_set[idx] for idx in range(11000)]
 
     train_loader = DataLoader(train_set, batch_size=args.batch_size, pin_memory=True,
-                              num_workers=params['num_workers'], shuffle=False, drop_last=True)
+                              num_workers=params['num_workers'], shuffle=params['shuffle'], drop_last=True)
 
     print("++++++++++++ Training Data is loaded containing {} batches of size:{}".format(len(train_loader), args.batch_size))
     #print(args.train_with_eval)
