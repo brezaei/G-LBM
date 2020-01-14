@@ -118,6 +118,6 @@ fi
 
 for vid in ${video_list[@]}; do
     echo submitting video:$vid
-    sbatch  exec_SBMnet2016_discovery.sh $vid $batch_size
+    sbatch  train_SBMnet2016_discovery.sh $vid $batch_size
 done
 
