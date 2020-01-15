@@ -116,11 +116,11 @@ def load_checkpoint(model=None, optimizer=None, filename='checkpoint'):
         checkpoint = torch.load(filename)
         epoch = checkpoint['epoch'] if 'epoch' in checkpoint.keys() else -1
         it = checkpoint.get('it', 0.0)
-        if model is not None and checkpoint['model_state'] is not None:
-            model.load_state_dict(checkpoint['model_state'])
-        if optimizer is not None and checkpoint['optimizer_state'] is not None:
-            optimizer.load_state_dict(checkpoint['optimizer_state'])
-        print("==> Done")
+        if model is not None and checkpoint['state_dict'] is not None:
+            model.load_state_dict(checkpoint['state_dict'])
+        if optimizer is not None and checkpoint['state_dict'] is not None:
+            optimizer.load_state_dict(checkpoint['optimizer'])
+        print("==> Model Loading Done")
     else:
         raise FileNotFoundError
 

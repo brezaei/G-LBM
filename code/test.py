@@ -18,40 +18,44 @@ parser.add_argument("-vid_path", type=str, required=True, help="video frame fold
 parser.add_argument("-ckpt", type=str, default=None, help="model checkpoint to be used for test")
 parser.add_argument("-result_path", type=str, default='../result/', help="path to the folder for generated background frames")
 parser.add_argument("-im_format", type=str, default='jpg', help="image format of the video frames")
+parser.add_argument('--mgpus', action='store_true', help='whether to use multiple gpus')
 args = parser.parse_args()
 
 # create dataloader
-data_set = util.dataset_singleVideo(path=args.vid_path, img_format=args.im_format, transform=None)
-data_loader = DataLoader(data_set, batch_size=1, pin_memory=True,num_workers=1,
-                        shuffle=False, drop_last=False)
 
-# find the size of the video frames
+if __name__ == "__main__":
 
-im = io.imread(os.path.join(args.vid_path, 'in000001.{}'.format(args.im_format)))
-in_size = im.shape
-in_size = in_size[0:2]
+    data_set = util.dataset_singleVideo(path=args.vid_path, img_format=args.im_format, transform=None)
+    data_loader = DataLoader(data_set, batch_size=1, pin_memory=True,num_workers=1,
+                            shuffle=False, drop_last=False)
 
-model = LR_VAE(
-                    kernel=4, 
-                    stride =2, 
-                    z_dim=120, 
-                    in_size= in_size,
-                    frames = 1, 
-                    nonlinearity=None
-)
+    # find the size of the video frames
 
-if args.mgpus:
-    model = nn.DataParallel(model)
-model.cuda()
+    im = io.imread(os.path.join(args.vid_path, 'in000001.{}'.format(args.im_format)))
+    in_size = im.shape
+    in_size = in_size[0:2]
 
-pure_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-it, start_epoch = util.load_checkpoint(pure_model, filename=args.ckpt)
+    model = LR_VAE(
+                        kernel=4, 
+                        stride =2, 
+                        z_dim=120, 
+                        in_size= in_size,
+                        frames = 1, 
+                        nonlinearity=None
+    )
+    #print("========= model is loaded!")
+    if args.mgpus:
+        model = nn.DataParallel(model)
+    model.cuda()
 
-model.eval()
-for i, data in enumerate(data_loader):
-    data = data.cuda(non_blocking=True).float()
-    bg, _, _, _ = model(data)
-    bg_im = bg.view(3, in_size[0], in_size[1])
-    os.makedirs(os.path.dirname('{}/bg{:06d}.png'.format(args.result_path,i)), exist_ok=True)
-    torchvision.utils.save_image(bg_im, '{}/bg{:06d}.png'.format(args.result_path,i))
+    pure_model = model.module if isinstance(model, torch.nn.DataParallel) else model
+    it, start_epoch = util.load_checkpoint(pure_model, filename=args.ckpt)
+
+    model.eval()
+    for i, data in enumerate(data_loader):
+        data = data.cuda(non_blocking=True).float()
+        bg, _, _, _ = model(data)
+        bg_im = bg.view(3, in_size[0], in_size[1])
+        os.makedirs(os.path.dirname('{}/bg{:06d}.png'.format(args.result_path,i)), exist_ok=True)
+        torchvision.utils.save_image(bg_im, '{}/bg{:06d}.png'.format(args.result_path,i))
 

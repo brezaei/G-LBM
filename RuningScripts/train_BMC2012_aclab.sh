@@ -1,24 +1,5 @@
 #!/bin/bash
 
-#SBATCH --nodes=1
-#SBATCH --ntasks=4
-#SBATCH --time=23:59:00
-#SBATCH --job-name=BS
-#SBATCH --partition=gpu
-#SBATCH --mem=64Gb
-#SBATCH --gres=gpu:k40m:1
-#SBATCH --output=result_bs.%j.out
-
-# module load cuda/9.2
-# module load anaconda3/3.7
-
-# cd /scratch/rezaei.b/BackgroundSubtraction/BackgroundSubtraction_LowRankVAE/code
-# source activate torch_py3
-
-# nvcc -V
-
-# nvidia-smi
-
 echo "--------------------------"
 lr=0.0015
 alpha=200
