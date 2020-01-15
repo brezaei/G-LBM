@@ -107,7 +107,8 @@ venv.bak/
 data/
 result/
 checkpoints/
-output_*/
+output*/
+result*/
 #ignore variables
 *.png
 *.mp4
