@@ -19,6 +19,7 @@ parser.add_argument("-ckpt", type=str, default=None, help="model checkpoint to b
 parser.add_argument("-result_path", type=str, default='../result/', help="path to the folder for generated background frames")
 parser.add_argument("-im_format", type=str, default='jpg', help="image format of the video frames")
 parser.add_argument('--mgpus', action='store_true', help='whether to use multiple gpus')
+parser.add_argument("-device", type=str, default='gpu', help="device for mapping the model and loading data: 'gpu' or 'cpu' [default:'gpu']")
 args = parser.parse_args()
 
 # create dataloader
@@ -46,14 +47,22 @@ if __name__ == "__main__":
     #print("========= model is loaded!")
     if args.mgpus:
         model = nn.DataParallel(model)
-    model.cuda()
+
+    if args.device == 'cpu':
+        model.cpu()
+    else:
+        model.gpu()
 
     pure_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-    it, start_epoch = util.load_checkpoint(pure_model, filename=args.ckpt)
+    it, start_epoch = util.load_checkpoint(pure_model, filename=args.ckpt, device=args.device)
 
     model.eval()
     for i, data in enumerate(data_loader):
-        data = data.cuda(non_blocking=True).float()
+        if args.device=='cpu':
+            data = data.float()
+        else:
+            data = data.cuda(non_blocking=True).float()
+        
         bg, _, _, _ = model(data)
         bg_im = bg.view(3, in_size[0], in_size[1])
         os.makedirs(os.path.dirname('{}/bg{:06d}.png'.format(args.result_path,i)), exist_ok=True)

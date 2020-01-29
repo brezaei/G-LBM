@@ -120,5 +120,6 @@ result*/
 *.avi
 *.gif
 *.pth
+*.csv
 # vscode 
 .vscode/

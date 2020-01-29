@@ -110,10 +110,10 @@ def set_bn_momentum_default(bn_momentum):
 
     return fn
 
-def load_checkpoint(model=None, optimizer=None, filename='checkpoint'):
+def load_checkpoint(model=None, optimizer=None, device='gpu', filename='checkpoint'):
     if os.path.isfile(filename):
         print("==> Loading from checkpoint '{}'".format(filename))
-        checkpoint = torch.load(filename)
+        checkpoint = torch.load(filename, map_location=torch.device(device))
         epoch = checkpoint['epoch'] if 'epoch' in checkpoint.keys() else -1
         it = checkpoint.get('it', 0.0)
         if model is not None and checkpoint['state_dict'] is not None:
@@ -165,7 +165,7 @@ class BNMomentumScheduler(object):
 class Trainer(object):
     def __init__(self, model, optimizer, im_size, loss_fn, lr_scheduler = None, 
                  lr_warmup_scheduler=None, bnm_scheduler=None, warmup_epoch=-1, grad_norm_clip=1.0, check_freq=10,
-                 learning_rate=0.001, recon_path='../recon/', ckpt_dir='../checkpoints/'):
+                 learning_rate=0.001, recon_path='../recon/', ckpt_dir='../checkpoints/', device='gpu'):
         self.model = model
         self.im_size = im_size
         self.loss_fn = loss_fn
@@ -182,6 +182,7 @@ class Trainer(object):
         self.optimizer = optimizer
         self.grad_norm_clip = grad_norm_clip
         self.epoch_losses = []
+        self.device = device
 
     def save_checkpoint(self, epoch, it):
         file_name = os.path.join(self.ckpt_dir, 'checkpoint_epoch_{:d}.pth'.format(epoch+1))
@@ -264,8 +265,11 @@ class Trainer(object):
                         for deconvLayer in self.model.deconv:
                             l = deconvLayer.model[0].weight
                             print("min:{}, max:{}".format(torch.max(l).item(), torch.min(l).item()))
-
-                    data = data.cuda(non_blocking=True).float()
+                    if self.device == 'cpu':
+                        data = data.float()
+                    else:
+                        data = data.cuda(non_blocking=True).float()
+                    
                     if self.lr_warmup_scheduler is not None and epoch < self.warmup_epoch:
                         self.lr_warmup_scheduler.step(it)
                         cur_lr = self.lr_warmup_scheduler.get_lr()[0]
@@ -342,7 +346,11 @@ class Trainer(object):
                     self.model.eval()
                     if test_loader is not None:
                         for i, sample in enumerate(test_loader):
-                            sample = sample.cuda(non_blocking=True).float()
+                            if self.device == 'cpu':
+                                sample = sample.float()
+                            else:
+                                sample = sample.cuda(non_blocking=True).float()
+                            
                             #sample = torch.unsqueeze(sample, 0)
                             self.recon_frame(epoch+1, i, sample)
                     self.model.train()

@@ -160,14 +160,15 @@ class LR_VAE(nn.Module):
         # ///TODO: Check if only one affine transform is sufficient.
         self.z_mean = LinearUnit(h_layer_5, self.z_dim, batchnorm=False)
         self.z_logvar = LinearUnit(h_layer_5, self.z_dim, batchnorm=False)
+        self.final_conv_size, self.pad_list = ConvOutSize(in_size, 4 , self.kernel, self.stride, 0)
         # ///TODO: check if it is better to add padding in here instead of output padding in deconv
         self.conv = nn.Sequential(
-                ConvUnit(3, h_layer_1, self.kernel, self.stride), 
-                ConvUnit(h_layer_1, h_layer_2, self.kernel, self.stride, nonlinearity=self.nl), 
-                ConvUnit(h_layer_2, h_layer_3, self.kernel, self.stride, nonlinearity=self.nl),
-                ConvUnit(h_layer_3, h_layer_4, self.kernel, self.stride, nonlinearity=self.nl), 
+                ConvUnit(3, h_layer_1, self.kernel, self.stride, padding=self.pad_list[0]), 
+                ConvUnit(h_layer_1, h_layer_2, self.kernel, self.stride, nonlinearity=self.nl, padding=self.pad_list[1]), 
+                ConvUnit(h_layer_2, h_layer_3, self.kernel, self.stride, nonlinearity=self.nl, padding=self.pad_list[2]),
+                ConvUnit(h_layer_3, h_layer_4, self.kernel, self.stride, nonlinearity=self.nl, padding=self.pad_list[3]), 
                 )
-        self.final_conv_size, self.pad_list = ConvOutSize(in_size, 4 , self.kernel, self.stride, 0)
+        
 
         self.conv_fc = LinearUnit(h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), h_layer_5)
 
@@ -175,10 +176,10 @@ class LR_VAE(nn.Module):
                 LinearUnit(h_layer_5, h_layer_4 * (self.final_conv_size[0]*self.final_conv_size[1]), False))
         #///TODO: try the nn.Tanh() as the nonlinearity, it scales the output in [-1, 1] compared to sigmoid which is [0, 1]
         self.deconv = nn.Sequential(
-                ConvUnitTranspose(h_layer_4, h_layer_3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[3]),
-                ConvUnitTranspose(h_layer_3, h_layer_2, self.kernel, self.stride, padding=0, out_padding=self.pad_list[2]),
-                ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, padding=0, out_padding=self.pad_list[1]),
-                ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=self.pad_list[0], nonlinearity=nn.Sigmoid()))
+                ConvUnitTranspose(h_layer_4, h_layer_3, self.kernel, self.stride, padding=0, out_padding=0),
+                ConvUnitTranspose(h_layer_3, h_layer_2, self.kernel, self.stride, padding=0, out_padding=0),
+                ConvUnitTranspose(h_layer_2, h_layer_1, self.kernel, self.stride, padding=0, out_padding=0),
+                ConvUnitTranspose(h_layer_1, 3, self.kernel, self.stride, padding=0, out_padding=0, nonlinearity=nn.Sigmoid()))
         
         for m in self.modules():
             if isinstance(m, nn.BatchNorm2d) or isinstance(m, nn.BatchNorm1d):

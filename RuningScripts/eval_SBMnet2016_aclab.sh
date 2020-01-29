@@ -1,17 +1,17 @@
 vid_list=(
-    "backgroundMotion/fall"
-    "basic/511"
-    "basic/MPEG4_40"
-    "basic/PETS2006"
-    "clutter/UCF-fishes"
-    "intermittentMotion/AVSS2007"
-    "intermittentMotion/copyMachine"
-    "intermittentMotion/streetCorner"
-    "jitter/badminton"
-    "veryShort/CUHK_Square"
-    "veryShort/MIT"
-    "veryShort/NoisyNight"
-    "veryShort/snowFall"
+    # "backgroundMotion/fall"
+    # "basic/MPEG4_40"
+    # "basic/PETS2006"
+    # "clutter/UCF-fishes"
+    # "intermittentMotion/AVSS2007"
+    # "intermittentMotion/copyMachine"
+    # "intermittentMotion/streetCorner"
+    # "jitter/badminton"
+    # "veryShort/CUHK_Square"
+    # "veryShort/MIT"
+     "veryShort/NoisyNight"
+    # "veryShort/snowFall"
+    # "veryShort/Toscana"
 )
 
 #conda activate torch_py3
@@ -32,6 +32,6 @@ for vid in ${vid_list[@]}; do
     #echo $chk_path
     #echo $result_path
 
-    python test.py -vid_path "${vid_path}" -ckpt "${chk_path}" -result_path "${result_path}" &> "${result_path}/log.txt"
+    python test.py -vid_path "${vid_path}" -ckpt "${chk_path}" -result_path "${result_path}" -device 'cpu' &> "${result_path}/log.txt"
     echo evaluation on $vid is finished 
 done

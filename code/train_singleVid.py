@@ -38,6 +38,7 @@ parser.add_argument("-lr_decay",type=float,default=0.5,help="Learning rate decay
 parser.add_argument("-decay_step_list", nargs='+', type=int,default=[50, 100, 150, 200, 250, 300],help="Learning rate decay step [default: 50, 100, 150, 200, 250, 300]")
 parser.add_argument("-clip", type=float, default=1.0, help="clip value for the gradient [default=1.0]")
 parser.add_argument("-im_format", type=str, default='jpg', help="image format of the video frames")
+parser.add_argument("-device", type=str, default='gpu', help="device for mapping the model and loading data: 'gpu' or 'cpu' [default:'gpu']")
 args = parser.parse_args()
 ###############################################################
 
@@ -138,21 +139,29 @@ if __name__ == "__main__":
 
     if args.mgpus:
         model = nn.DataParallel(model)
-    model.cuda()
+    
+    if args.device = 'cpu':
+        model.cpu()
+    else:
+        model.gpu()
 
     # x = torch.zeros(120, 3, 240, 320, dtype=torch.float, requires_grad=False, device='cuda')
     # y=model(x)
     # g=make_dot(y)
     # g.view()
-
+    
     start_epoch = it = 0
     last_epoch = -1
-    lr_scheduler, bnm_scheduler = create_scheduler(optimizer, total_steps=len(train_loader) * args.epochs,
-                                                   last_epoch=last_epoch)
+    
     if args.ckpt is not None:
         pure_model = model.module if isinstance(model, torch.nn.DataParallel) else model
-        it, start_epoch = util.load_checkpoint(pure_model, optimizer, filename=args.ckpt)
+        it, start_epoch = util.load_checkpoint(pure_model, optimizer, filename=args.ckpt, device=args.device)
         last_epoch = start_epoch + 1
+
+
+    lr_scheduler, bnm_scheduler = create_scheduler(optimizer, total_steps=len(train_loader) * args.epochs,
+                                                   last_epoch=last_epoch)
+
 
     if params['lr_warmup']:
         lr_warmup_scheduler = util.CosineWarmupLR(optimizer, T_max=params['warmup_epoch'] * len(train_loader),
@@ -178,6 +187,7 @@ if __name__ == "__main__":
         learning_rate= args.lr, 
         recon_path= args.recon_path, 
         ckpt_dir= args.ckpt_dir
+        device = args.device
         )
 
     if args.ckpt is not None:
