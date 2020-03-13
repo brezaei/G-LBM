@@ -1,2 +1,2 @@
-# BigDataSparsity_LowRankVAE
-Background Subtraction Via Probabilistic Low Rank Representation
+# G-LBM: Generative Low-dimensional Background Modelin
+
