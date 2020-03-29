@@ -13,7 +13,7 @@ This repository is the implementation of the G-LBM model presented in the follow
 This model is implemented with folowing frameworks:
 * Python3.7, 
 * Pytorch 1.2 
-* CUDA 9.0 and 10.0
+* CUDA 9.0 or 10.0
 
 ## Datasets
 
