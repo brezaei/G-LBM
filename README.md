@@ -1,12 +1,23 @@
 # G-LBM: Generative Low-dimensional Background Modeling
+This repository is the implementation of the G-LBM model presented in the following paper preprint:
+```
+@article{rezaei2020g,
+  title={G-LBM: Generative Low-dimensional Background Model Estimation from Video Sequences},
+  author={Rezaei, Behnaz and Farnoosh, Amirreza and Ostadabbas, Sarah},
+  journal={arXiv preprint arXiv:2003.07335},
+  year={2020}
+}
+```
 ## Requirements
-## Requirements
 
-This code is tested on Python3.7, Pytorch 1.2 and CUDA 8.0, 10.0.
+This model is implemented with folowing frameworks:
+* Python3.7, 
+* Pytorch 1.2 
+* CUDA 9.0 and 10.0
 
-## Data preparation
+## Datasets
 
-The following dataset is used for experiments in the paper:
+The following datasets are used for experiments in the paper:
 
 BMC2012 dataset:
 
@@ -33,9 +44,13 @@ BMC2012 dataset:
 ```
 
 
-## Training and Testing
+## Training
+1) Before running the train and test scripts, you have to save the motion masks of the videos by running the /utils/saveflows.py on the video datasets. We use [PyFlow](https://github.com/pathak22/pyflow) pipeline to compute optical flows fot generating motion masks.
+2) Execute the code/train.py with proper input arguments to train the model on the dataset.
 
-  
+
+## Test
+For running the trained model on eacch video execute the code/test.py by proper input arguments.
 
 ## Reference
 Rezaei, Behnaz, Amirreza Farnoosh, and Sarah Ostadabbas. "G-LBM: Generative Low-dimensional Background Model Estimation from Video Sequences." arXiv preprint arXiv:2003.07335 (2020).
