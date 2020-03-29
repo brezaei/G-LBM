@@ -109,6 +109,9 @@ result/
 checkpoints/
 output*/
 result*/
+Masks/
+NetVisuals/
+toBeMasked/
 #ignore variables
 *.png
 *.mp4

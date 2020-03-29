@@ -1,23 +1,23 @@
 vid_list=(
-    # "backgroundMotion/fall"
-    # "basic/MPEG4_40"
-    # "basic/PETS2006"
-    # "clutter/UCF-fishes"
-    # "intermittentMotion/AVSS2007"
-    # "intermittentMotion/copyMachine"
-    # "intermittentMotion/streetCorner"
-    # "jitter/badminton"
-    # "veryShort/CUHK_Square"
-    # "veryShort/MIT"
-     "veryShort/NoisyNight"
-    # "veryShort/snowFall"
-    # "veryShort/Toscana"
+"basic/511"
+"basic/Blurred"
+"clutter/Board"
+"clutter/boulevardJam"
+"intermittentMotion/AVSS2007"
+"intermittentMotion/busStation"
+"jitter/badminton"
+"jitter/boulevard"
+"veryLong/BusStopMorning"
+"veryShort/CUHK_Square"
+"veryShort/DynamicBackground"
+"illuminationChanges/CameraParameter"
+"backgroundMotion/advertisementBoard"
 )
 
 #conda activate torch_py3
 cd /media/behnaz/My\ Book/BackgroundSubtraction/BackgroundSubtraction_LowRankVAE/code
 
-result_base="../result_nbn_nshuffle/SBMnet2016"
+result_base="../result_nbn_nshuffle/SBMnet2016_nsampl_npp"
 chk_base="../output_nbn_nshuffle/checkpoints/SBMnet2016"
 vid_base="/media/behnaz/My Book/BackgroundSubtraction/Data/SBMnet2016"
 

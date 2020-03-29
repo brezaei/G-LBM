@@ -133,7 +133,8 @@ if __name__ == "__main__":
                     z_dim=120, 
                     in_size= in_size,
                     frames = 1, 
-                    nonlinearity=None
+                    nonlinearity=None,
+                    sampling_z=True
     )
     optimizer = create_optimizer(model)
 

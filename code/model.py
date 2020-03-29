@@ -148,13 +148,14 @@ class LR_VAE(nn.Module):
 
     """
     def __init__(self, kernel=4, stride =2, z_dim=120, in_size=(320,240),
-                 frames = 1, nonlinearity=None):
+                 frames = 1, nonlinearity=None, sampling_z=True):
         super(LR_VAE, self).__init__()
         self.kernel = kernel
         self.stride = stride
         self.z_dim = z_dim
         self.in_size = in_size
         self.frames = frames
+        self.sampling_z=sampling_z
         self.nl = nn.LeakyReLU(0.2) if nonlinearity is None else nonlinearity
 
         # ///TODO: Check if only one affine transform is sufficient.
@@ -220,7 +221,7 @@ class LR_VAE(nn.Module):
         x = self.deconv(x)
         return x.view(-1, self.frames, 3, self.in_size[0], self.in_size[1])
 
-    def reparam(self, z_mean, z_logvar, random_sampling=True):
+    def reparam(self, z_mean, z_logvar, random_sampling):
         if random_sampling is True:
             eps = torch.randn_like(z_logvar)
             std = torch.exp(0.5*z_logvar)
@@ -230,7 +231,7 @@ class LR_VAE(nn.Module):
             return z_mean
     def forward(self, x):
         z_mean, z_logvar = self.encoder(x)
-        z = self.reparam(z_mean, z_logvar)
+        z = self.reparam(z_mean, z_logvar, self.sampling_z)
         return self.decoder(z), z_mean, z_logvar, z
 
 
