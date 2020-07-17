@@ -53,5 +53,4 @@ BMC2012 dataset:
 For running the trained model on eacch video execute the code/test.py by proper input arguments.
 
 ## Reference
-Rezaei, Behnaz, Amirreza Farnoosh, and Sarah Ostadabbas. "G-LBM: Generative Low-dimensional Background Model Estimation from Video Sequences." arXiv preprint arXiv:2003.07335 (2020).
-
+Rezaei, Behnaz, Amirreza Farnoosh, and Sarah Ostadabbas. "G-LBM: Generative Low-dimensional Background Model Estimation from Video Sequences." In Proceedings of the European Conference on Computer Vision (ECCV). 2020.
