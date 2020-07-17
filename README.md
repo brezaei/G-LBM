@@ -1,5 +1,5 @@
 # G-LBM: Generative Low-dimensional Background Modeling
-This repository is the implementation of the G-LBM model presented in the following paper preprint:
+This repository is the implementation of our ECCV 2020 paper presented in the following paper preprint:
 ```
 @article{rezaei2020g,
   title={G-LBM: Generative Low-dimensional Background Model Estimation from Video Sequences},
